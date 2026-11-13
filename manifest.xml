@@ -1,16 +1,13 @@
 <?xml version="1.0"?>
 <iq:manifest version="3" xmlns:iq="http://www.garmin.com/xml/connectiq">
-    <iq:application id="6f1c2a7e-3b9d-4e5a-9c41-8d2f7b0e5a13"
+    <iq:application id="df54d0ac-0db2-465c-871e-b1e0cf191455"
                     type="watchface"
                     name="@Strings.AppName"
-                    entry="TransformationApp"
+                    entry="JKWFenixApp"
                     launcherIcon="@Drawables.LauncherIcon"
-                    minApiLevel="3.2.0">
+                    minApiLevel="4.2.0">
         <iq:products>
-            <iq:product id="fenix843mm"/>
             <iq:product id="fenix847mm"/>
-            <iq:product id="fenix8solar47mm"/>
-            <iq:product id="fenix8solar51mm"/>
         </iq:products>
         <iq:permissions/>
         <iq:languages>

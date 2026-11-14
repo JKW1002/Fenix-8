@@ -9,35 +9,26 @@ import Toybox.WatchUi;
 
 //! JKWFenix: a dive-style analogue watch face for the fenix 8 AMOLED 47mm.
 //!
-//!   - Black wave-pattern dial, dive bezel (20, 30 and 40 turned to read upright)
-//!   - Baton hour markers, triangle at 12, FENIX under 12
+//! The parts that never change (black wave dial, dive bezel with upright
+//! 20/30/40, baton markers, FENIX, small dial rings and gauge tracks) are a
+//! pre-rendered image, resources/drawables/dial.png. Drawing them live was
+//! too slow and tripped Garmin's watchdog.
+//!
+//! Drawn live on top:
 //!   - Skeleton sword hands with lume tips
-//!   - Seconds hand with orange lollipop, shown only while the watch is awake
-//!     (after a wrist raise), hidden in low power mode to save battery
-//!   - Small dials: date at 3, battery at 6, steps at 9 (orange gauges;
-//!     battery turns red below 20%)
-//!   - Always-on: outlined hands and dim markers, shifted slightly each minute
+//!   - Seconds hand with orange lollipop, only while awake (after a wrist raise)
+//!   - Date at 3, battery at 6 (orange, red below 20%), steps at 9 (orange)
+//!   - Always-on: outlined hands and dim markers, shifted each minute
 //!     to protect the AMOLED screen from burn-in
 //!
 //! All measurements are written for a 454 px screen and scaled by _s.
 class JKWFenixView extends WatchUi.WatchFace {
 
     // Palette
-    private const BEZEL = 0x141518;
-    private const BEZEL_EDGE = 0x8A8F98;
-    private const PRINT = 0xF2F2F2;
-    private const LUME = 0xF4F8EE;
-    private const LUME_PIP = 0xD8F5D0;
     private const STEEL = 0xC9CCD2;
     private const HAND_STEEL = 0xD9DDE3;
     private const HAND_CUT = 0x0B0C0E;
-    private const DIAL_INNER = 0x2A2D33;
-    private const DIAL_OUTER = 0x08090B;
-    private const SUB_FILL = 0x050506;
-    private const SUB_RING = 0xB8BCC4;
-    private const SUB_TICK = 0x6E6E6E;
-    private const GAUGE_TRACK = 0x2E2F32;
-    private const LABEL = 0xCFCFCF;
+    private const LUME = 0xF4F8EE;
     private const ORANGE = 0xFF7A00;
     private const RED = 0xFF3B30;
     private const SECONDS = 0xE9ECF0;
@@ -45,7 +36,6 @@ class JKWFenixView extends WatchUi.WatchFace {
     private const AOD_HAND = 0xA0A0A0;
 
     private const SUB_OFFSET = 100.0;   // distance of small dials from centre
-    private const SUB_RADIUS = 40.0;
     private const GAUGE_RADIUS = 28.0;
     private const GAUGE_START = 225;    // degrees, 0 = 3 o'clock, anticlockwise
     private const GAUGE_SPAN = 270;
@@ -54,14 +44,10 @@ class JKWFenixView extends WatchUi.WatchFace {
     private var _cy as Float = 227.0;
     private var _s as Float = 1.0;
 
-    private var _bg = null;             // BufferedBitmapReference (or BufferedBitmap)
+    private var _dial = null;
     private var _isSleeping as Boolean = false;
-    private var _angledText as Boolean = false;
 
-    private var _fBezel = Graphics.FONT_XTINY;
-    private var _fBrand = Graphics.FONT_XTINY;
     private var _fValue = Graphics.FONT_XTINY;
-    private var _fLabel = Graphics.FONT_XTINY;
     private var _fDay = Graphics.FONT_XTINY;
     private var _fDate = Graphics.FONT_TINY;
 
@@ -73,8 +59,8 @@ class JKWFenixView extends WatchUi.WatchFace {
         _cx = dc.getWidth() / 2.0;
         _cy = dc.getHeight() / 2.0;
         _s = dc.getWidth() / 454.0;
-        loadFonts(dc);
-        _bg = null;
+        _dial = WatchUi.loadResource(Rez.Drawables.Dial);
+        loadFonts();
     }
 
     function onUpdate(dc as Graphics.Dc) as Void {
@@ -91,13 +77,9 @@ class JKWFenixView extends WatchUi.WatchFace {
             return;
         }
 
-        var bmp = getBackground(dc);
-        if (bmp != null) {
-            dc.drawBitmap(0, 0, bmp);
-        } else {
-            drawStatic(dc);
+        if (_dial != null) {
+            dc.drawBitmap(0, 0, _dial);
         }
-
         drawDate(dc);
         drawBattery(dc);
         drawSteps(dc);
@@ -116,16 +98,11 @@ class JKWFenixView extends WatchUi.WatchFace {
 
     // =============================================================== fonts
 
-    private function loadFonts(dc as Graphics.Dc) as Void {
+    private function loadFonts() as Void {
         var bold = ["RobotoCondensedBold", "RobotoBold", "BionicBold", "Roboto"];
-        var regular = ["RobotoCondensedRegular", "RobotoRegular", "BionicSemiBold", "Roboto"];
-        _fBezel = vectorFont(bold, 22, Graphics.FONT_XTINY);
-        _fBrand = vectorFont(bold, 22, Graphics.FONT_XTINY);
         _fValue = vectorFont(bold, 17, Graphics.FONT_XTINY);
-        _fLabel = vectorFont(regular, 11, Graphics.FONT_XTINY);
         _fDay = vectorFont(bold, 13, Graphics.FONT_XTINY);
         _fDate = vectorFont(bold, 28, Graphics.FONT_TINY);
-        _angledText = (dc has :drawAngledText) && !(_fBezel instanceof Number);
     }
 
     private function vectorFont(faces as Array<String>, size as Number, fallback) {
@@ -138,222 +115,7 @@ class JKWFenixView extends WatchUi.WatchFace {
         return fallback;
     }
 
-    // ============================================== static background layer
-
-    //! The dial, bezel, markers and small dial faces never change, so they
-    //! are drawn once into an off-screen bitmap and copied each update.
-    private function getBackground(dc as Graphics.Dc) {
-        var bmp = null;
-        if (_bg != null) {
-            bmp = (_bg has :get) ? _bg.get() : _bg;
-        }
-        if (bmp == null) {
-            var opts = {:width => dc.getWidth(), :height => dc.getHeight()};
-            if (Graphics has :createBufferedBitmap) {
-                _bg = Graphics.createBufferedBitmap(opts);
-                bmp = _bg.get();
-            } else {
-                _bg = new Graphics.BufferedBitmap(opts);
-                bmp = _bg;
-            }
-            if (bmp != null) {
-                drawStatic(bmp.getDc());
-            }
-        }
-        return bmp;
-    }
-
-    private function drawStatic(dc as Graphics.Dc) as Void {
-        if (dc has :setAntiAlias) {
-            dc.setAntiAlias(true);
-        }
-        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        dc.clear();
-
-        drawDial(dc);
-        drawWaves(dc);
-        drawBezel(dc);
-        drawMinuteTrack(dc);
-        drawMarkers(dc);
-        drawBrand(dc);
-        drawSubdialFace(dc, _cx + SUB_OFFSET * _s, _cy, null);
-        drawSubdialFace(dc, _cx, _cy + SUB_OFFSET * _s, "BATT");
-        drawSubdialFace(dc, _cx - SUB_OFFSET * _s, _cy, "STEPS");
-        dc.setPenWidth(1);
-    }
-
-    //! Soft radial gradient: lighter just above centre, darker at the edge
-    private function drawDial(dc as Graphics.Dc) as Void {
-        var steps = 24;
-        var r = 192.0 * _s;
-        for (var i = 0; i < steps; i++) {
-            var t = i.toFloat() / (steps - 1);
-            dc.setColor(lerpColor(DIAL_OUTER, DIAL_INNER, t), Graphics.COLOR_TRANSPARENT);
-            dc.fillCircle(_cx, _cy - 40.0 * _s * t, r * (1.0 - t * 0.95));
-        }
-    }
-
-    //! Horizontal wave engraving, slightly lighter than the dial beneath it
-    private function drawWaves(dc as Graphics.Dc) as Void {
-        var r = 186.0 * _s;
-        var step = 6.0 * _s;
-        var amp = 5.0 * _s;
-        var period = 16.0 * _s;
-        var pen = (3.0 * _s).toNumber();
-        dc.setPenWidth(pen < 1 ? 1 : pen);
-
-        var y = _cy - r + 6.0 * _s;
-        while (y < _cy + r - 4.0 * _s) {
-            var dy = y - _cy;
-            var half = Math.sqrt(r * r - dy * dy) - 3.0 * _s;
-            var x = _cx - half;
-            var px = x;
-            var py = y + amp * Math.sin(px / period);
-            x += step;
-            while (x <= _cx + half) {
-                var ny = y + amp * Math.sin(x / period);
-                dc.setColor(lighten(dialColorAt(x, ny), 0x10), Graphics.COLOR_TRANSPARENT);
-                dc.drawLine(px, py, x, ny);
-                px = x;
-                py = ny;
-                x += step;
-            }
-            y += 11.0 * _s;
-        }
-    }
-
-    private function drawBezel(dc as Graphics.Dc) as Void {
-        // Bezel ring
-        dc.setColor(BEZEL, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth((40.0 * _s).toNumber());
-        dc.drawCircle(_cx, _cy, 209.0 * _s);
-        dc.setPenWidth((2.0 * _s).toNumber() < 1 ? 1 : (2.0 * _s).toNumber());
-        dc.setColor(BEZEL_EDGE, Graphics.COLOR_TRANSPARENT);
-        dc.drawCircle(_cx, _cy, 190.0 * _s);
-
-        // Minute ticks for the first 15 minutes
-        dc.setColor(PRINT, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth((2.0 * _s).toNumber() < 1 ? 1 : (2.0 * _s).toNumber());
-        for (var m = 1; m < 15; m++) {
-            if (m % 5 == 0) {
-                continue;
-            }
-            var a = m / 60.0 * 2 * Math.PI;
-            dc.drawLine(polarX(a, 198.0), polarY(a, 198.0), polarX(a, 204.0), polarY(a, 204.0));
-        }
-
-        // Dots at 15, 25, 35, 45, 55
-        for (var d = 15; d < 60; d += 10) {
-            var da = d / 60.0 * 2 * Math.PI;
-            dc.fillCircle(polarX(da, 208.0), polarY(da, 208.0), 3.0 * _s);
-        }
-
-        // Numbers 10 to 50; 20, 30 and 40 turned so they read upright
-        for (var n = 10; n < 60; n += 10) {
-            var deg = n * 6;
-            var na = Math.toRadians(deg);
-            var x = polarX(na, 208.0);
-            var y = polarY(na, 208.0);
-            var text = n.toString();
-            var just = Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER;
-            if (_angledText) {
-                var rot = (n >= 20 && n <= 40) ? deg + 180 : deg;
-                // drawAngledText takes degrees anticlockwise
-                dc.drawAngledText(x, y, _fBezel, text, just, (360 - rot) % 360);
-            } else {
-                dc.drawText(x, y, _fBezel, text, just);
-            }
-        }
-
-        // Triangle and lume pip at 12
-        dc.fillPolygon([
-            [_cx - 14.0 * _s, _cy - 224.0 * _s],
-            [_cx + 14.0 * _s, _cy - 224.0 * _s],
-            [_cx, _cy - 198.0 * _s]
-        ]);
-        dc.setColor(LUME_PIP, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(_cx, _cy - 215.0 * _s, 4.0 * _s);
-    }
-
-    private function drawMinuteTrack(dc as Graphics.Dc) as Void {
-        dc.setColor(0xE8E8E8, Graphics.COLOR_TRANSPARENT);
-        for (var m = 0; m < 60; m++) {
-            var a = m / 60.0 * 2 * Math.PI;
-            var major = (m % 5 == 0);
-            var inner = major ? 172.0 : 177.0;
-            var pen = ((major ? 2.0 : 1.0) * _s).toNumber();
-            dc.setPenWidth(pen < 1 ? 1 : pen);
-            dc.drawLine(polarX(a, 183.0), polarY(a, 183.0), polarX(a, inner), polarY(a, inner));
-        }
-    }
-
-    private function drawMarkers(dc as Graphics.Dc) as Void {
-        for (var h = 1; h < 12; h++) {
-            if (h % 3 == 0) {
-                continue;   // 3, 6 and 9 are the small dials
-            }
-            var a = h / 12.0 * 2 * Math.PI;
-            var mx = polarX(a, 152.0);
-            var my = polarY(a, 152.0);
-            dc.setColor(STEEL, Graphics.COLOR_TRANSPARENT);
-            dc.fillPolygon(xform(rect(7.0, 15.0), a, mx, my));
-            dc.setColor(LUME, Graphics.COLOR_TRANSPARENT);
-            dc.fillPolygon(xform(rect(4.5, 12.5), a, mx, my));
-        }
-        var ty = _cy - 152.0 * _s;
-        dc.setColor(STEEL, Graphics.COLOR_TRANSPARENT);
-        dc.fillPolygon(xform(markerTriangle(true), 0.0, _cx, ty));
-        dc.setColor(LUME, Graphics.COLOR_TRANSPARENT);
-        dc.fillPolygon(xform(markerTriangle(false), 0.0, _cx, ty));
-    }
-
-    private function drawBrand(dc as Graphics.Dc) as Void {
-        var text = "FENIX";
-        var spacing = 5.0 * _s;
-        var chars = text.toCharArray();
-        var total = 0.0;
-        for (var i = 0; i < chars.size(); i++) {
-            total += dc.getTextWidthInPixels(chars[i].toString(), _fBrand);
-        }
-        total += spacing * (chars.size() - 1);
-
-        var x = _cx - total / 2.0;
-        var y = _cy - 95.0 * _s;
-        dc.setColor(PRINT, Graphics.COLOR_TRANSPARENT);
-        for (var j = 0; j < chars.size(); j++) {
-            var ch = chars[j].toString();
-            dc.drawText(x, y, _fBrand, ch, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-            x += dc.getTextWidthInPixels(ch, _fBrand) + spacing;
-        }
-    }
-
-    private function drawSubdialFace(dc as Graphics.Dc, x as Numeric, y as Numeric, label as String or Null) as Void {
-        var r = SUB_RADIUS * _s;
-        dc.setColor(SUB_FILL, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(x, y, r);
-
-        dc.setColor(SUB_TICK, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(1);
-        for (var i = 0; i < 30; i++) {
-            var a = i / 30.0 * 2 * Math.PI;
-            var s = Math.sin(a);
-            var c = Math.cos(a);
-            dc.drawLine(x + (r - 3 * _s) * s, y - (r - 3 * _s) * c, x + (r - 7 * _s) * s, y - (r - 7 * _s) * c);
-        }
-
-        var ring = (2.5 * _s).toNumber();
-        dc.setPenWidth(ring < 2 ? 2 : ring);
-        dc.setColor(SUB_RING, Graphics.COLOR_TRANSPARENT);
-        dc.drawCircle(x, y, r);
-
-        if (label != null) {
-            gauge(dc, x, y, 1.0, GAUGE_TRACK);
-            dc.setColor(LABEL, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(x, y + 22.0 * _s, _fLabel, label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        }
-    }
-
-    // ====================================================== live content
+    // ===================================================== small dials
 
     private function drawDate(dc as Graphics.Dc) as Void {
         var x = _cx + SUB_OFFSET * _s;
@@ -419,6 +181,8 @@ class JKWFenixView extends WatchUi.WatchFace {
         dc.setPenWidth(1);
     }
 
+    // =========================================================== hands
+
     private function drawHands(dc as Graphics.Dc, showSeconds as Boolean) as Void {
         var clock = System.getClockTime();
         var hourA = ((clock.hour % 12) + clock.min / 60.0) / 12.0 * 2 * Math.PI;
@@ -477,7 +241,8 @@ class JKWFenixView extends WatchUi.WatchFace {
         dc.fillCircle(dot[0], dot[1], 6.0 * _s);
 
         var tip = xform([[0.0, -170.0], [0.0, -154.0]], a, _cx, _cy);
-        dc.setPenWidth((3.0 * _s).toNumber() < 2 ? 2 : (3.0 * _s).toNumber());
+        var tipPen = (3.0 * _s).toNumber();
+        dc.setPenWidth(tipPen < 2 ? 2 : tipPen);
         dc.drawLine(tip[0][0], tip[0][1], tip[1][0], tip[1][1]);
         dc.setPenWidth(1);
     }
@@ -497,9 +262,9 @@ class JKWFenixView extends WatchUi.WatchFace {
             var a = h / 12.0 * 2 * Math.PI;
             var mx = ox + 152.0 * _s * Math.sin(a);
             var my = oy - 152.0 * _s * Math.cos(a);
-            outline(dc, xform(rect(5.0, 13.0), a, mx, my));
+            outline(dc, xform([[-5.0, -13.0], [5.0, -13.0], [5.0, 13.0], [-5.0, 13.0]], a, mx, my));
         }
-        outline(dc, xform(markerTriangle(true), 0.0, ox, oy - 152.0 * _s));
+        outline(dc, xform([[-15.0, -16.0], [15.0, -16.0], [0.0, 14.0]], 0.0, ox, oy - 152.0 * _s));
 
         var hourA = ((clock.hour % 12) + clock.min / 60.0) / 12.0 * 2 * Math.PI;
         var minA = clock.min / 60.0 * 2 * Math.PI;
@@ -519,7 +284,7 @@ class JKWFenixView extends WatchUi.WatchFace {
         }
     }
 
-    // ============================================================ helpers
+    // ========================================================== helpers
 
     //! Rotate shape points (in 454 px units, y up = negative) by a radians
     //! clockwise, scale them, and move them to (ox, oy)
@@ -533,53 +298,5 @@ class JKWFenixView extends WatchUi.WatchFace {
             out[i] = [ox + x * c - y * sn, oy + x * sn + y * c];
         }
         return out;
-    }
-
-    private function rect(hw as Numeric, hh as Numeric) as Array {
-        return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
-    }
-
-    private function markerTriangle(outer as Boolean) as Array {
-        if (outer) {
-            return [[-15.0, -16.0], [15.0, -16.0], [0.0, 14.0]];
-        }
-        return [[-10.0, -12.5], [10.0, -12.5], [0.0, 7.0]];
-    }
-
-    private function polarX(a as Numeric, r as Numeric) as Numeric {
-        return _cx + r * _s * Math.sin(a);
-    }
-
-    private function polarY(a as Numeric, r as Numeric) as Numeric {
-        return _cy - r * _s * Math.cos(a);
-    }
-
-    //! Approximate dial colour at a point, matching the gradient in drawDial
-    private function dialColorAt(x as Numeric, y as Numeric) as Number {
-        var dx = x - _cx;
-        var dy = y - (_cy - 20.0 * _s);
-        var d = Math.sqrt(dx * dx + dy * dy) / (192.0 * _s);
-        var t = 1.0 - d;
-        if (t < 0.0) {
-            t = 0.0;
-        }
-        return lerpColor(DIAL_OUTER, DIAL_INNER, t);
-    }
-
-    private function lerpColor(a as Number, b as Number, t as Numeric) as Number {
-        var r = (((a >> 16) & 0xFF) + (((b >> 16) & 0xFF) - ((a >> 16) & 0xFF)) * t).toNumber();
-        var g = (((a >> 8) & 0xFF) + (((b >> 8) & 0xFF) - ((a >> 8) & 0xFF)) * t).toNumber();
-        var bl = ((a & 0xFF) + ((b & 0xFF) - (a & 0xFF)) * t).toNumber();
-        return (r << 16) | (g << 8) | bl;
-    }
-
-    private function lighten(c as Number, amt as Number) as Number {
-        var r = ((c >> 16) & 0xFF) + amt;
-        var g = ((c >> 8) & 0xFF) + amt;
-        var b = (c & 0xFF) + amt;
-        if (r > 255) { r = 255; }
-        if (g > 255) { g = 255; }
-        if (b > 255) { b = 255; }
-        return (r << 16) | (g << 8) | b;
     }
 }

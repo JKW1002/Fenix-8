@@ -41,6 +41,6 @@ manifest.xml               App ID, type and supported device
 monkey.jungle              Build configuration
 source/JKWFenixApp.mc      App entry point
 source/JKWFenixView.mc     All drawing logic
-resources/                 App name and launcher icon
+resources/                 App name, launcher icon and dial image (dial.png)
 docs/preview.png           Design mockup
 ```

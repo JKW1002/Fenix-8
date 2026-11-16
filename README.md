@@ -6,18 +6,19 @@ A dive-style analogue watch face for the Garmin fenix 8 AMOLED 47mm, written in 
 
 *Design mockup. On the watch, Garmin's own fonts are used.*
 
-## Design
+## Design (v1.0.1)
 
-- Black dial with a wave pattern, and FENIX under 12
-- Dive bezel with a 0 to 60 minute scale; 20, 30 and 40 are turned to read the right way up
-- Baton hour markers with lume, and a triangle at 12
+- Black wave-pattern dial running to the edge of the screen; the fenix 8's own metal bezel provides the 0 to 60 scale
+- Minute track at the screen edge, with a triangle at 12 and FENIX beneath it
 - Skeleton sword hour and minute hands with lume tips
 - Seconds hand with a bright orange dot, shown after you raise your wrist and hidden when the watch dims to save battery
-- Three small dials:
+- Three large small dials:
   - 3 o'clock: date (day and number)
   - 6 o'clock: battery percentage with an orange gauge, turning red below 20%
   - 9 o'clock: step count with an orange gauge showing progress to your daily goal
-- Always-on display: outlined hands and dim markers only, moved slightly each minute to protect the AMOLED screen
+- Always-on display: outlined hands, dim hour ticks and the triangle at 12, moved slightly each minute to protect the AMOLED screen
+
+Version 1.0.0 had an on-screen dive bezel and baton hour markers; see `docs/mockups` for the design history.
 
 ## Building and testing
 

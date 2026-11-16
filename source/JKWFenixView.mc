@@ -9,16 +9,16 @@ import Toybox.WatchUi;
 
 //! JKWFenix: a dive-style analogue watch face for the fenix 8 AMOLED 47mm.
 //!
-//! The parts that never change (black wave dial, dive bezel with upright
-//! 20/30/40, baton markers, FENIX, small dial rings and gauge tracks) are a
-//! pre-rendered image, resources/drawables/dial.png. Drawing them live was
+//! The parts that never change (black wave dial running to the screen edge,
+//! minute track, triangle at 12, FENIX, small dial rings and gauge tracks) are
+//! a pre-rendered image, resources/drawables/dial.png. Drawing them live was
 //! too slow and tripped Garmin's watchdog.
 //!
 //! Drawn live on top:
 //!   - Skeleton sword hands with lume tips
 //!   - Seconds hand with orange lollipop, only while awake (after a wrist raise)
 //!   - Date at 3, battery at 6 (orange, red below 20%), steps at 9 (orange)
-//!   - Always-on: outlined hands and dim markers, shifted each minute
+//!   - Always-on: outlined hands, dim hour ticks and triangle, shifted each minute
 //!     to protect the AMOLED screen from burn-in
 //!
 //! All measurements are written for a 454 px screen and scaled by _s.
@@ -35,8 +35,9 @@ class JKWFenixView extends WatchUi.WatchFace {
     private const AOD_MARKER = 0x4A4A4A;
     private const AOD_HAND = 0xA0A0A0;
 
-    private const SUB_OFFSET = 100.0;   // distance of small dials from centre
-    private const GAUGE_RADIUS = 28.0;
+    private const SUB_OFFSET = 116.0;   // distance of small dials from centre
+    private const GAUGE_RADIUS = 46.0;
+    private const GAUGE_PEN = 7.5;
     private const GAUGE_START = 225;    // degrees, 0 = 3 o'clock, anticlockwise
     private const GAUGE_SPAN = 270;
 
@@ -47,9 +48,9 @@ class JKWFenixView extends WatchUi.WatchFace {
     private var _dial = null;
     private var _isSleeping as Boolean = false;
 
-    private var _fValue = Graphics.FONT_XTINY;
+    private var _fValue = Graphics.FONT_TINY;
     private var _fDay = Graphics.FONT_XTINY;
-    private var _fDate = Graphics.FONT_TINY;
+    private var _fDate = Graphics.FONT_SMALL;
 
     function initialize() {
         WatchFace.initialize();
@@ -100,9 +101,9 @@ class JKWFenixView extends WatchUi.WatchFace {
 
     private function loadFonts() as Void {
         var bold = ["RobotoCondensedBold", "RobotoBold", "BionicBold", "Roboto"];
-        _fValue = vectorFont(bold, 17, Graphics.FONT_XTINY);
-        _fDay = vectorFont(bold, 13, Graphics.FONT_XTINY);
-        _fDate = vectorFont(bold, 28, Graphics.FONT_TINY);
+        _fValue = vectorFont(bold, 24, Graphics.FONT_TINY);
+        _fDay = vectorFont(bold, 19, Graphics.FONT_XTINY);
+        _fDate = vectorFont(bold, 42, Graphics.FONT_SMALL);
     }
 
     private function vectorFont(faces as Array<String>, size as Number, fallback) {
@@ -122,9 +123,9 @@ class JKWFenixView extends WatchUi.WatchFace {
         var info = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
         var just = Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER;
         dc.setColor(0xE8E8E8, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(x, _cy - 14.0 * _s, _fDay, (info.day_of_week as String).toUpper(), just);
+        dc.drawText(x, _cy - 23.0 * _s, _fDay, (info.day_of_week as String).toUpper(), just);
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(x, _cy + 9.0 * _s, _fDate, (info.day as Number).format("%d"), just);
+        dc.drawText(x, _cy + 14.0 * _s, _fDate, (info.day as Number).format("%d"), just);
     }
 
     private function drawBattery(dc as Graphics.Dc) as Void {
@@ -159,7 +160,7 @@ class JKWFenixView extends WatchUi.WatchFace {
             frac = 1.0;
         }
         var r = GAUGE_RADIUS * _s;
-        var pen = (5.0 * _s).toNumber();
+        var pen = (GAUGE_PEN * _s).toNumber();
         if (pen < 2) {
             pen = 2;
         }
@@ -257,12 +258,13 @@ class JKWFenixView extends WatchUi.WatchFace {
         var pen = (2.0 * _s).toNumber();
         dc.setPenWidth(pen < 1 ? 1 : pen);
 
+        // Dim hour ticks at the edge, matching the minute track on the dial
         dc.setColor(AOD_MARKER, Graphics.COLOR_TRANSPARENT);
-        for (var h = 1; h < 12; h++) {
+        for (var h = 0; h < 12; h++) {
             var a = h / 12.0 * 2 * Math.PI;
-            var mx = ox + 152.0 * _s * Math.sin(a);
-            var my = oy - 152.0 * _s * Math.cos(a);
-            outline(dc, xform([[-5.0, -13.0], [5.0, -13.0], [5.0, 13.0], [-5.0, 13.0]], a, mx, my));
+            var sn = Math.sin(a);
+            var cs = Math.cos(a);
+            dc.drawLine(ox + 206.0 * _s * sn, oy - 206.0 * _s * cs, ox + 220.0 * _s * sn, oy - 220.0 * _s * cs);
         }
         outline(dc, xform([[-15.0, -16.0], [15.0, -16.0], [0.0, 14.0]], 0.0, ox, oy - 152.0 * _s));
 

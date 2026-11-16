@@ -1,0 +1,62 @@
+<!doctype html><html><body style="margin:0;background:#000">
+<canvas id="b" width="454" height="454"></canvas>
+<script>
+function face(c,dialIn,dialOut,bezel,flip){
+const x=c.getContext('2d'),W=454,C=W/2,P=Math.PI;
+const pol=(a,r)=>[C+r*Math.sin(a),C-r*Math.cos(a)];
+x.save();x.beginPath();x.arc(C,C,C,0,2*P);x.clip();
+x.fillStyle='#000';x.fillRect(0,0,W,W);
+
+
+
+
+
+
+
+
+
+
+
+
+
+// dial
+g=x.createRadialGradient(C,C-40,10,C,C,227);g.addColorStop(0,dialIn);g.addColorStop(1,dialOut);
+x.fillStyle=g;x.beginPath();x.arc(C,C,227,0,2*P);x.fill();
+x.save();x.beginPath();x.arc(C,C,227,0,2*P);x.clip();x.strokeStyle='rgba(255,255,255,0.06)';x.lineWidth=3;
+for(let y=0;y<W;y+=11){x.beginPath();for(let xx=0;xx<W;xx+=3){const yy=y+5*Math.sin(xx/16);xx==0?x.moveTo(xx,yy):x.lineTo(xx,yy);}x.stroke();}
+x.restore();
+// minute track
+for(let m=0;m<60;m++){const a=m/60*2*P,[a1,b1]=pol(a,222),[a2,b2]=pol(a,m%5?214:206);x.strokeStyle='#e8e8e8';x.lineWidth=m%5?1:2;x.beginPath();x.moveTo(a1,b1);x.lineTo(a2,b2);x.stroke();}
+// hour markers
+
+
+x.save();x.translate(C,C-152);x.fillStyle='#c9ccd2';x.beginPath();x.moveTo(-15,-16);x.lineTo(15,-16);x.lineTo(0,14);x.closePath();x.fill();
+x.fillStyle='#f4f8ee';x.beginPath();x.moveTo(-10,-12.5);x.lineTo(10,-12.5);x.lineTo(0,7);x.closePath();x.fill();x.restore();
+// FENIX
+x.fillStyle='#f2f2f2';x.font='bold 21px Arial';x.textAlign='center';x.letterSpacing='5px';x.fillText('FENIX',C+2,C-95);x.letterSpacing='0px';
+// subdials
+function sub(cx,cy){const r=64;let gg=x.createRadialGradient(cx,cy,5,cx,cy,r);gg.addColorStop(0,'rgba(0,0,0,0.55)');gg.addColorStop(1,'rgba(0,0,0,0.25)');
+x.fillStyle=gg;x.beginPath();x.arc(cx,cy,r,0,2*P);x.fill();x.strokeStyle='#b8bcc4';x.lineWidth=2.5;x.stroke();
+for(let i=0;i<30;i++){const a=i/30*2*P;x.strokeStyle='rgba(230,230,230,0.5)';x.lineWidth=1;x.beginPath();x.moveTo(cx+(r-3)*Math.sin(a),cy-(r-3)*Math.cos(a));x.lineTo(cx+(r-7)*Math.sin(a),cy-(r-7)*Math.cos(a));x.stroke();}}
+function gauge(cx,cy,pct,col){x.lineWidth=7.5;x.lineCap='round';x.strokeStyle='rgba(255,255,255,0.15)';x.beginPath();x.arc(cx,cy,46,0.75*P,2.25*P);x.stroke();
+x.strokeStyle=col;x.beginPath();x.arc(cx,cy,46,0.75*P,0.75*P+1.5*P*pct);x.stroke();x.lineCap='butt';}
+const d=116;
+sub(C+d,C);x.textAlign='center';x.fillStyle='#e8e8e8';x.font='bold 19px Arial';x.fillText('SAT',C+d,C-23);x.fillStyle='#fff';x.font='bold 42px Arial';x.fillText('14',C+d,C+14);
+sub(C,C+d);gauge(C,C+d,0.78,'#FF7A00');x.fillStyle='#fff';x.font='bold 24px Arial';x.fillText('78%',C,C+d+2);x.font='14px Arial';x.fillStyle='#cfcfcf';x.fillText('BATT',C,C+d+36);
+sub(C-d,C);gauge(C-d,C,0.64,'#FF7A00');x.fillStyle='#fff';x.font='bold 24px Arial';x.fillText('6412',C-d,C+2);x.font='14px Arial';x.fillStyle='#cfcfcf';x.fillText('STEPS',C-d,C+36);
+// hands 10:10:35
+function sword(a,len,w,tail){x.save();x.translate(C,C);x.rotate(a);
+x.fillStyle='#d9dde3';x.beginPath();x.moveTo(-w*0.35,tail);x.lineTo(-w,-len*0.25);x.lineTo(-w*0.75,-len*0.9);x.lineTo(0,-len);x.lineTo(w*0.75,-len*0.9);x.lineTo(w,-len*0.25);x.lineTo(w*0.35,tail);x.closePath();
+x.shadowColor='rgba(0,0,0,0.6)';x.shadowBlur=6;x.shadowOffsetY=3;x.fill();x.shadowColor='transparent';
+x.fillStyle='#f4f8ee';x.beginPath();x.moveTo(-w*0.6,-len*0.5);x.lineTo(-w*0.45,-len*0.88);x.lineTo(0,-len*0.96);x.lineTo(w*0.45,-len*0.88);x.lineTo(w*0.6,-len*0.5);x.closePath();x.fill();
+x.fillStyle=dialOut;x.beginPath();x.moveTo(-w*0.45,-len*0.18);x.lineTo(-w*0.55,-len*0.42);x.lineTo(w*0.55,-len*0.42);x.lineTo(w*0.45,-len*0.18);x.closePath();x.fill();x.restore();}
+sword((10+10/60)/12*2*P,105,11,14);sword(10.5/60*2*P,160,9,14);
+x.save();x.translate(C,C);x.rotate(35/60*2*P);x.shadowColor='rgba(0,0,0,0.6)';x.shadowBlur=5;x.shadowOffsetY=3;
+x.strokeStyle='#e9ecf0';x.lineWidth=2.5;x.beginPath();x.moveTo(0,40);x.lineTo(0,-170);x.stroke();x.shadowColor='transparent';
+x.fillStyle='#e9ecf0';x.beginPath();x.arc(0,-118,9,0,2*P);x.fill();x.fillStyle='#FF7A00';x.beginPath();x.arc(0,-118,6,0,2*P);x.fill();
+x.fillStyle='#FF7A00';x.fillRect(-1.5,-170,3,16);x.restore();
+x.fillStyle='#c9ccd2';x.beginPath();x.arc(C,C,8,0,2*P);x.fill();x.fillStyle='#555';x.beginPath();x.arc(C,C,3,0,2*P);x.fill();
+x.restore();}
+
+face(document.getElementById('b'),'#2a2d33','#08090b',['#0a0a0c','#1c1d21'],true);
+</script></body></html>
